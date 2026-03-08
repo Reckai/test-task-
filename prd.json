@@ -1,0 +1,157 @@
+{
+  "project": "TextMixer",
+  "branchName": "ralph/text-mixer-app",
+  "description": "Text Mixer App - A React Native Expo app that takes two text inputs, sends them to Claude AI to creatively mix them, with polished animations and ElevenLabs voice integration",
+  "userStories": [
+    {
+      "id": "US-009",
+      "title": "App Configuration & Environment Setup",
+      "description": "As a developer, I need proper project configuration for expo-router, reanimated, and environment variables.",
+      "acceptanceCriteria": [
+        "app.json / app.config.js configured for expo-router scheme",
+        "Babel config includes react-native-reanimated/plugin",
+        ".env file with ANTHROPIC_API_KEY and ELEVENLABS_API_KEY placeholders",
+        ".env added to .gitignore",
+        "Entry point set up for expo-router (index.ts exports expo-router)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Foundation story - must be done first. Convert from registerRootComponent to expo-router entry point."
+    },
+    {
+      "id": "US-008",
+      "title": "Navigation & Screen Transitions",
+      "description": "As a developer, I need to set up expo-router with 4 screen files in a linear flow.",
+      "acceptanceCriteria": [
+        "File-based routing with expo-router: 4 screen files in app/ directory",
+        "Layout file (app/_layout.tsx) with stack navigator configured",
+        "Linear flow only - no back navigation (forward + Mix Again reset)",
+        "Screen files: app/index.tsx (Text 1), app/text2.tsx (Text 2), app/mixing.tsx (Mixing), app/result.tsx (Result)",
+        "Basic placeholder content on each screen with navigation buttons",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Set up basic navigation skeleton. Custom transitions will be enhanced in later stories."
+    },
+    {
+      "id": "US-005",
+      "title": "Claude API Integration",
+      "description": "As a developer, I need to integrate the Claude API to perform the text mixing operation.",
+      "acceptanceCriteria": [
+        "API service module at services/claude.ts",
+        "API key read from .env file (ANTHROPIC_API_KEY) via expo-constants",
+        "Style Transfer prompt: Rewrite Text 1 in the style of Text 2",
+        "Mashup prompt: Creatively combine these two texts into one",
+        "Proper error handling: timeout, network failure, invalid response",
+        "Response parsed and returned as string",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Backend service only - no UI changes. Will be consumed by mixing screen."
+    },
+    {
+      "id": "US-001",
+      "title": "Capture Text 1 Screen",
+      "description": "As a user, I want to type my first piece of text so that it can be used as input for mixing.",
+      "acceptanceCriteria": [
+        "Screen displays Text 1 header",
+        "Multiline text input field with keyboard support",
+        "Continue button is disabled until text is non-empty",
+        "When user taps Continue, navigates to Screen 2 passing text1 as param",
+        "Clean minimal design with dark background and accent colors",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Mic button and pill animation will be added in later stories (US-006, transitions enhancement)."
+    },
+    {
+      "id": "US-002",
+      "title": "Capture Text 2 with Text 1 Preview and Mode Selector",
+      "description": "As a user, I want to enter my second text while seeing my first text and selecting a mixing mode.",
+      "acceptanceCriteria": [
+        "Screen displays Text 2 header",
+        "Text 1 appears as a pill/badge at the top of the screen",
+        "Same input pattern as Screen 1 (multiline text field)",
+        "Mode selector toggle between Style Transfer and Mashup (segmented control)",
+        "Mix them button is disabled until text is non-empty",
+        "Tapping Mix them navigates to mixing screen with text1, text2, and mode as params",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Mic button will be added in US-006."
+    },
+    {
+      "id": "US-003",
+      "title": "Mixing Animation Screen",
+      "description": "As a user, I want to see an engaging animation while the AI processes my texts.",
+      "acceptanceCriteria": [
+        "Both texts shown as visual pill/orb elements",
+        "At least one Reanimated-driven animation: orbiting or merging effect",
+        "Indeterminate progress indicator present",
+        "Haptic feedback fires when mixing starts (medium impact)",
+        "Haptic feedback fires when mixing completes (success notification)",
+        "Claude API is called with selected mixing mode prompt",
+        "On API completion, animation resolves and transitions to result screen",
+        "Error state: if API fails, show error message with Try Again button",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Uses claude.ts service from US-005. Gradient glow effects optional."
+    },
+    {
+      "id": "US-004",
+      "title": "Result Reveal Screen",
+      "description": "As a user, I want to see the mixed result with a satisfying reveal animation.",
+      "acceptanceCriteria": [
+        "Result text animates in with a typewriter effect or fade-in",
+        "Sound effect plays on reveal (bundle a short chime .mp3 or use expo-av tone)",
+        "Label shows mixing mode used (Style Transfer or Mashup)",
+        "Mix Again button resets state and navigates back to Screen 1",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Listen button will be added in US-007."
+    },
+    {
+      "id": "US-006",
+      "title": "ElevenLabs STT Integration (Voice Input)",
+      "description": "As a user, I want to record my voice and have it transcribed to text for hands-free input.",
+      "acceptanceCriteria": [
+        "Microphone button on both text capture screens (Screen 1 and Screen 2)",
+        "Tapping mic starts recording via expo-av; visual indicator shows recording",
+        "Tapping again ends recording, sends audio to ElevenLabs STT API",
+        "Transcribed text populates the input field",
+        "API key read from .env file (ELEVENLABS_API_KEY)",
+        "Error handling: permission denied, API failure, empty transcription",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Add mic button to existing Screen 1 and Screen 2."
+    },
+    {
+      "id": "US-007",
+      "title": "ElevenLabs TTS Integration (Listen to Result)",
+      "description": "As a user, I want to listen to the mixed result read aloud.",
+      "acceptanceCriteria": [
+        "Listen button on result screen",
+        "Tapping sends result text to ElevenLabs TTS API",
+        "Audio streams/plays back via expo-av",
+        "Loading state while TTS is generating",
+        "Button toggles to stop if audio is playing",
+        "Error handling for API failure",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Add Listen button to existing result screen."
+    }
+  ]
+}

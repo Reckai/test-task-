@@ -1,0 +1,8 @@
+## Codebase Patterns
+- Project uses Expo SDK 55 with managed workflow
+- expo-router for file-based navigation (app/ directory)
+- react-native-reanimated v4 for animations
+- TypeScript strict mode enabled
+- Entry point: index.ts → expo-router
+- API keys via .env and expo-constants
+---

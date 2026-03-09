@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAudioPlayer } from 'expo-audio';
 import type { MixingMode } from '../services/claude';
+import { Colors } from '../constants/colors';
 
 const MODE_LABELS: Record<MixingMode, string> = {
   'style-transfer': 'Style Transfer',
@@ -37,18 +38,21 @@ export default function ResultScreen() {
     opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.ease) });
     try { chimePlayer?.play(); } catch { /* non-critical */ }
 
-    // Typewriter effect with adaptive speed
+    // Typewriter effect using requestAnimationFrame for frame-aligned updates
     let index = 0;
     const charsPerTick = Math.max(1, Math.ceil(result.length / 120));
-    const interval = setInterval(() => {
+    let rafId: number;
+
+    const tick = () => {
       index += charsPerTick;
       setDisplayedText(result.slice(0, index));
-      if (index >= result.length) {
-        clearInterval(interval);
+      if (index < result.length) {
+        rafId = requestAnimationFrame(tick);
       }
-    }, 25);
+    };
+    rafId = requestAnimationFrame(tick);
 
-    return () => clearInterval(interval);
+    return () => cancelAnimationFrame(rafId);
   }, [result]);
 
   const handleMixAgain = () => {
@@ -72,6 +76,7 @@ export default function ResultScreen() {
         <ScrollView
           style={styles.resultScroll}
           contentContainerStyle={styles.resultContent}
+          contentInsetAdjustmentBehavior="automatic"
         >
           <Animated.View style={animatedStyle}>
             <Text
@@ -85,7 +90,7 @@ export default function ResultScreen() {
         </ScrollView>
 
         <Pressable
-          style={styles.button}
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
           onPress={handleMixAgain}
           accessibilityRole="button"
           accessibilityLabel="Mix Again"
@@ -100,7 +105,7 @@ export default function ResultScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -108,49 +113,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: '#141414',
+    color: Colors.foreground,
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 12,
   },
   modeBadge: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
+    borderCurve: 'continuous',
     marginBottom: 24,
   },
   modeBadgeText: {
-    color: '#fafafa',
+    color: Colors.primaryForeground,
     fontSize: 13,
     fontWeight: '600',
   },
   resultScroll: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
+    borderCurve: 'continuous',
     marginBottom: 24,
   },
   resultContent: {
     padding: 20,
   },
   resultText: {
-    color: '#141414',
+    color: Colors.foreground,
     fontSize: 17,
     lineHeight: 26,
   },
   button: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
+    borderCurve: 'continuous',
     alignItems: 'center',
     width: '100%',
   },
+  buttonPressed: {
+    opacity: 0.7,
+  },
   buttonText: {
-    color: '#fafafa',
+    color: Colors.primaryForeground,
     fontSize: 16,
     fontWeight: '600',
   },

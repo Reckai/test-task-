@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { MixingMode } from '../services/claude';
 import { useVoiceInput } from '../hooks/useVoiceInput';
+import { Colors } from '../constants/colors';
 
 const MODES: { key: MixingMode; label: string }[] = [
   { key: 'style-transfer', label: 'Style Transfer' },
@@ -41,14 +42,6 @@ export default function CaptureScreen() {
 
   const stepRef = useRef<CaptureStep>('text1');
   const text1InputRef = useRef<TextInput>(null);
-  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  // Cleanup all timeouts on unmount
-  useEffect(() => {
-    return () => {
-      timeoutRefs.current.forEach(clearTimeout);
-    };
-  }, []);
 
   // Single voice input instance — routes to active step via stepRef
   const onTranscription = useCallback((transcribed: string) => {
@@ -80,8 +73,8 @@ export default function CaptureScreen() {
   const s5o = useSharedValue(0);
   const s5y = useSharedValue(20);
 
-  const staggerOpacities = [s1o, s2o, s3o, s4o, s5o];
-  const staggerYs = [s1y, s2y, s3y, s4y, s5y];
+  const staggerOpacities = useRef([s1o, s2o, s3o, s4o, s5o]).current;
+  const staggerYs = useRef([s1y, s2y, s3y, s4y, s5y]).current;
 
   const triggerText2Stagger = useCallback(() => {
     const dur = 350;
@@ -91,65 +84,72 @@ export default function CaptureScreen() {
     staggerYs.forEach((sv, i) => {
       sv.value = withDelay(STAGGER_DELAYS[i], withTiming(0, { duration: dur }));
     });
-  }, []);
+  }, [staggerOpacities, staggerYs]);
 
   const resetText2Stagger = useCallback(() => {
     staggerOpacities.forEach((sv) => { sv.value = 0; });
     staggerYs.forEach((sv) => { sv.value = 20; });
+  }, [staggerOpacities, staggerYs]);
+
+  // --- Transition completion callbacks (called from UI thread via runOnJS) ---
+  const onStepForwardComplete = useCallback(() => {
+    setCaptureStep('text2');
+    stepRef.current = 'text2';
+    setIsAnimating(false);
+    triggerText2Stagger();
+  }, [triggerText2Stagger]);
+
+  const onStepBackComplete = useCallback(() => {
+    setCaptureStep('text1');
+    stepRef.current = 'text1';
+    setIsAnimating(false);
+    text1InputRef.current?.focus();
   }, []);
 
   // --- Handlers ---
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
     if (!isText1Valid || isAnimating) return;
     setIsAnimating(true);
     Keyboard.dismiss();
 
-    const t1 = setTimeout(() => {
-      stepProgress.value = withTiming(1, {
-        duration: 900,
-        easing: Easing.inOut(Easing.ease),
-      });
+    stepProgress.value = withTiming(
+      1,
+      { duration: 900, easing: Easing.inOut(Easing.ease) },
+      (finished) => {
+        'worklet';
+        if (finished) {
+          runOnJS(onStepForwardComplete)();
+        }
+      },
+    );
+  }, [isText1Valid, isAnimating, onStepForwardComplete]);
 
-      // After morph completes, trigger stagger and update step
-      const t2 = setTimeout(() => {
-        setCaptureStep('text2');
-        stepRef.current = 'text2';
-        setIsAnimating(false);
-        triggerText2Stagger();
-      }, 500);
-      timeoutRefs.current.push(t2);
-    }, 150);
-    timeoutRefs.current.push(t1);
-  };
-
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (isAnimating) return;
     setIsAnimating(true);
     Keyboard.dismiss();
 
     resetText2Stagger();
 
-    stepProgress.value = withTiming(0, {
-      duration:900,
-      easing: Easing.inOut(Easing.ease),
-    });
+    stepProgress.value = withTiming(
+      0,
+      { duration: 900, easing: Easing.inOut(Easing.ease) },
+      (finished) => {
+        'worklet';
+        if (finished) {
+          runOnJS(onStepBackComplete)();
+        }
+      },
+    );
+  }, [isAnimating, resetText2Stagger, onStepBackComplete]);
 
-    const t1 = setTimeout(() => {
-      setCaptureStep('text1');
-      stepRef.current = 'text1';
-      setIsAnimating(false);
-      text1InputRef.current?.focus();
-    }, 770);
-    timeoutRefs.current.push(t1);
-  };
-
-  const handleMix = () => {
+  const handleMix = useCallback(() => {
     if (!isText2Valid) return;
     router.push({
       pathname: '/mixing',
       params: { text1: text1.trim(), text2: text2.trim(), mode },
     });
-  };
+  }, [isText2Valid, text1, text2, mode]);
 
   // Reset when returning from mixing/result
   useFocusEffect(
@@ -160,7 +160,7 @@ export default function CaptureScreen() {
       setCaptureStep('text1');
       stepRef.current = 'text1';
       setIsAnimating(false);
-    }, []),
+    }, [resetText2Stagger]),
   );
 
   // --- Animated styles ---
@@ -240,8 +240,10 @@ export default function CaptureScreen() {
 
   const staggerStyles = [staggerStyle1, staggerStyle2, staggerStyle3, staggerStyle4, staggerStyle5];
 
-  const displayText1 =
-    text1.trim().length > 60 ? text1.trim().slice(0, 60) + '...' : text1.trim();
+  const displayText1 = useMemo(() => {
+    const trimmed = text1.trim();
+    return trimmed.length > 60 ? trimmed.slice(0, 60) + '...' : trimmed;
+  }, [text1]);
 
   const isText1Step = captureStep === 'text1';
 
@@ -272,7 +274,7 @@ export default function CaptureScreen() {
                 value={text1}
                 onChangeText={setText1}
                 placeholder="Type or paste your text here..."
-                placeholderTextColor="#a3a3a3"
+                placeholderTextColor={Colors.placeholder}
                 multiline
                 textAlignVertical="top"
                 autoFocus
@@ -291,7 +293,11 @@ export default function CaptureScreen() {
         <Animated.View style={fadeOutBottomStyle} pointerEvents={isText1Step ? 'auto' : 'none'}>
           <View style={styles.row}>
             <Pressable
-              style={[styles.micButton, isRecording && isText1Step && styles.micButtonActive]}
+              style={({ pressed }) => [
+                styles.micButton,
+                isRecording && isText1Step && styles.micButtonActive,
+                pressed && styles.pressed,
+              ]}
               onPress={toggleRecording}
               disabled={isTranscribing || isAnimating || !isText1Step}
               accessibilityRole="button"
@@ -299,14 +305,18 @@ export default function CaptureScreen() {
               accessibilityState={{ busy: isTranscribing && isText1Step }}
             >
               {isTranscribing && isText1Step ? (
-                <ActivityIndicator size="small" color="#141414" />
+                <ActivityIndicator size="small" color={Colors.foreground} />
               ) : (
                 <Text style={styles.micIcon}>{isRecording && isText1Step ? '⏹' : '🎤'}</Text>
               )}
             </Pressable>
 
             <Pressable
-              style={[styles.button, !isText1Valid && styles.buttonDisabled]}
+              style={({ pressed }) => [
+                styles.button,
+                !isText1Valid && styles.buttonDisabled,
+                pressed && isText1Valid && styles.pressed,
+              ]}
               onPress={handleContinue}
               disabled={!isText1Valid || isAnimating}
               accessibilityRole="button"
@@ -319,10 +329,10 @@ export default function CaptureScreen() {
             </Pressable>
           </View>
 
-          {isRecording && isText1Step && (
+          {isRecording && isText1Step ? (
             <Text style={styles.recordingHint}>Recording... tap to stop</Text>
-          )}
-          {micError && isText1Step ? <Text style={styles.errorText}>{micError}</Text> : null}
+          ) : null}
+          {!!micError && isText1Step ? <Text style={styles.errorText}>{micError}</Text> : null}
         </Animated.View>
 
         {/* Text2 content — hidden at step 0, expands + staggers in at step 1 */}
@@ -341,7 +351,7 @@ export default function CaptureScreen() {
               value={text2}
               onChangeText={setText2}
               placeholder="Type or paste your text here..."
-              placeholderTextColor="#a3a3a3"
+              placeholderTextColor={Colors.placeholder}
               multiline
               textAlignVertical="top"
               editable={!isText1Step && !isAnimating}
@@ -357,9 +367,10 @@ export default function CaptureScreen() {
                 {MODES.map((m) => (
                   <Pressable
                     key={m.key}
-                    style={[
+                    style={({ pressed }) => [
                       styles.segment,
                       mode === m.key && styles.segmentActive,
+                      pressed && styles.pressed,
                     ]}
                     onPress={() => setMode(m.key)}
                     accessibilityRole="radio"
@@ -383,7 +394,7 @@ export default function CaptureScreen() {
           <Animated.View style={staggerStyles[4]}>
             <View style={styles.row}>
               <Pressable
-                style={styles.backButton}
+                style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
                 onPress={handleBack}
                 disabled={isAnimating}
                 accessibilityRole="button"
@@ -393,7 +404,11 @@ export default function CaptureScreen() {
               </Pressable>
 
               <Pressable
-                style={[styles.micButton, isRecording && !isText1Step && styles.micButtonActive]}
+                style={({ pressed }) => [
+                  styles.micButton,
+                  isRecording && !isText1Step && styles.micButtonActive,
+                  pressed && styles.pressed,
+                ]}
                 onPress={toggleRecording}
                 disabled={isTranscribing || isAnimating || isText1Step}
                 accessibilityRole="button"
@@ -401,14 +416,18 @@ export default function CaptureScreen() {
                 accessibilityState={{ busy: isTranscribing && !isText1Step }}
               >
                 {isTranscribing && !isText1Step ? (
-                  <ActivityIndicator size="small" color="#141414" />
+                  <ActivityIndicator size="small" color={Colors.foreground} />
                 ) : (
                   <Text style={styles.micIcon}>{isRecording && !isText1Step ? '⏹' : '🎤'}</Text>
                 )}
               </Pressable>
 
               <Pressable
-                style={[styles.button, !isText2Valid && styles.buttonDisabled]}
+                style={({ pressed }) => [
+                  styles.button,
+                  !isText2Valid && styles.buttonDisabled,
+                  pressed && isText2Valid && styles.pressed,
+                ]}
                 onPress={handleMix}
                 disabled={!isText2Valid || isAnimating}
                 accessibilityRole="button"
@@ -421,10 +440,10 @@ export default function CaptureScreen() {
               </Pressable>
             </View>
 
-            {isRecording && !isText1Step && (
+            {isRecording && !isText1Step ? (
               <Text style={styles.recordingHint}>Recording... tap to stop</Text>
-            )}
-            {micError && !isText1Step ? <Text style={styles.errorText}>{micError}</Text> : null}
+            ) : null}
+            {!!micError && !isText1Step ? <Text style={styles.errorText}>{micError}</Text> : null}
           </Animated.View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -435,7 +454,7 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -443,21 +462,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    color: '#141414',
+    color: Colors.foreground,
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   subtitle: {
-    color: '#737373',
+    color: Colors.foregroundMuted,
     fontSize: 16,
     marginBottom: 24,
   },
   inputOuter: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: Colors.border,
     borderRadius: 12,
+    borderCurve: 'continuous',
     paddingHorizontal: 17,
     paddingVertical: 15,
     minHeight: 140,
@@ -465,64 +485,67 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   inputInner: {
-    color: '#141414',
+    color: Colors.foreground,
     fontSize: 16,
     flex: 1,
     padding: 0,
     textAlignVertical: 'top',
   },
   pillLabel: {
-    color: '#a3a3a3',
+    color: Colors.placeholder,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   pillText: {
-    color: '#737373',
+    color: Colors.foregroundMuted,
     fontSize: 14,
   },
   text2Input: {
-    backgroundColor: '#f5f5f5',
-    color: '#141414',
+    backgroundColor: Colors.surface,
+    color: Colors.foreground,
     fontSize: 16,
     borderRadius: 12,
+    borderCurve: 'continuous',
     padding: 16,
     minHeight: 120,
     maxHeight: 200,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: Colors.border,
     marginBottom: 20,
   },
   modeContainer: {
     marginBottom: 24,
   },
   modeLabel: {
-    color: '#737373',
+    color: Colors.foregroundMuted,
     fontSize: 14,
     marginBottom: 8,
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderRadius: 10,
+    borderCurve: 'continuous',
     padding: 3,
   },
   segment: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
+    borderCurve: 'continuous',
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Colors.primary,
   },
   segmentText: {
-    color: '#737373',
+    color: Colors.foregroundMuted,
     fontSize: 14,
     fontWeight: '600',
   },
   segmentTextActive: {
-    color: '#fafafa',
+    color: Colors.primaryForeground,
   },
   row: {
     flexDirection: 'row',
@@ -533,28 +556,28 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: Colors.border,
   },
   micButtonActive: {
-    backgroundColor: '#dc2626',
-    borderColor: '#dc2626',
+    backgroundColor: Colors.recording,
+    borderColor: Colors.recording,
   },
   backButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: Colors.border,
   },
   backButtonText: {
-    color: '#737373',
+    color: Colors.foregroundMuted,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -563,31 +586,35 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
+    borderCurve: 'continuous',
     alignItems: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#e5e5e5',
+    backgroundColor: Colors.border,
   },
   buttonText: {
-    color: '#fafafa',
+    color: Colors.primaryForeground,
     fontSize: 16,
     fontWeight: '600',
   },
   buttonTextDisabled: {
-    color: '#a3a3a3',
+    color: Colors.placeholder,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   recordingHint: {
-    color: '#dc2626',
+    color: Colors.recording,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 12,
   },
   errorText: {
-    color: '#dc2626',
+    color: Colors.error,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 8,

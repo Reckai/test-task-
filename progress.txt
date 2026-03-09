@@ -4,5 +4,102 @@
 - react-native-reanimated v4 for animations
 - TypeScript strict mode enabled
 - Entry point: index.ts → expo-router
-- API keys via .env and expo-constants
+- API keys via .env with EXPO_PUBLIC_ prefix (process.env.EXPO_PUBLIC_*)
+- Dark theme: background #1a1a2e, text #fff
+- Screen files: app/index.tsx, app/text2.tsx, app/mixing.tsx, app/result.tsx
+---
+
+## 2026-03-08 - US-009
+- Configured app.json with expo-router scheme
+- Created babel.config.js with reanimated plugin
+- Created .env with API key placeholders
+- Added .env to .gitignore
+- Set up expo-router entry point (index.ts)
+- Created app/ directory with _layout.tsx and 4 placeholder screens
+- Files changed: app.json, .gitignore, index.ts, babel.config.js, app/_layout.tsx, app/index.tsx, app/text2.tsx, app/mixing.tsx, app/result.tsx
+- **Learnings for future iterations:**
+  - expo-router entry: just `import 'expo-router/entry'` in index.ts
+  - Need `scheme` field in app.json for expo-router deep linking
+  - Reanimated plugin must be LAST in babel plugins array
+---
+
+## 2026-03-08 - US-008
+- Added navigation buttons to all 4 screens with linear forward flow
+- Layout uses fade animation, gestureEnabled: false
+- Result screen uses router.dismissAll() + router.replace('/') for Mix Again reset
+- Files changed: app/_layout.tsx, app/index.tsx, app/text2.tsx, app/mixing.tsx, app/result.tsx
+- **Learnings for future iterations:**
+  - Use router.push() for forward navigation between screens
+  - Use router.dismissAll() + router.replace('/') to reset the entire stack
+  - Accent color: #6c63ff for buttons
+  - Common button style: paddingHorizontal 32, paddingVertical 14, borderRadius 12
+---
+
+## 2026-03-08 - US-005
+- Created services/claude.ts with mixTexts(text1, text2, mode) function
+- Uses fetch directly (not @anthropic-ai/sdk) for React Native compatibility
+- Supports 'style-transfer' and 'mashup' modes
+- API key via EXPO_PUBLIC_ANTHROPIC_API_KEY env var
+- Files changed: services/claude.ts, .env (updated to EXPO_PUBLIC_ prefix)
+- **Learnings for future iterations:**
+  - @anthropic-ai/sdk uses Node.js APIs, use fetch directly in React Native
+  - Need `anthropic-dangerous-direct-browser-access` header for client-side calls
+  - Env vars in Expo must use EXPO_PUBLIC_ prefix to be inlined
+  - MixingMode type exported from services/claude.ts: 'style-transfer' | 'mashup'
+---
+
+## 2026-03-08 - US-001
+- Implemented Text 1 capture screen with multiline TextInput
+- Continue button disabled when empty, navigates with text1 param
+- KeyboardAvoidingView + SafeAreaView
+- Files changed: app/index.tsx
+- **Learnings for future iterations:**
+  - Pass data between screens via router.push({ pathname, params })
+  - Input style: bg #16213e, border #2a2a4a, borderRadius 12
+  - Use textAlignVertical: 'top' for multiline inputs on Android
+---
+
+## 2026-03-08 - US-002
+- Text 2 screen with Text 1 pill preview, multiline input, segmented mode selector
+- Reads text1 from useLocalSearchParams, passes text1+text2+mode to mixing screen
+- Files changed: app/text2.tsx
+- **Learnings for future iterations:**
+  - useLocalSearchParams<{ text1: string }>() to read route params
+  - Pill style: bg #16213e, border #6c63ff, borderRadius 16
+  - Segmented control: row of Pressable in bg container, active gets #6c63ff bg
+---
+
+## 2026-03-08 - US-003
+- Mixing screen with orbiting orbs, Claude API call, haptic feedback, error handling
+- Orbs orbit using Reanimated rotation + trigonometry, merge on completion
+- Passes result and mode to result screen
+- Files changed: app/mixing.tsx
+- **Learnings for future iterations:**
+  - Reanimated orbit: use rotation shared value with cos/sin in animated style
+  - withRepeat(-1, false) for continuous rotation, withRepeat(-1, true) for ping-pong
+  - Haptics: impactAsync(Medium) for start, notificationAsync(Success) for complete
+  - Use setTimeout(600ms) after resolve animation before navigating
+---
+
+## 2026-03-08 - US-004
+- Result screen with typewriter effect, fade-in, chime sound, mode badge, Mix Again
+- Generated 880Hz chime.wav (0.3s) bundled in assets/
+- Files changed: app/result.tsx, assets/chime.wav
+- **Learnings for future iterations:**
+  - Typewriter: setInterval(25ms) incrementing slice index
+  - Sound: Audio.Sound.createAsync(require('...')) + playAsync()
+  - Unload sound on didJustFinish to prevent memory leaks
+  - require() for assets must use literal string paths
+---
+
+## 2026-03-08 - US-006
+- ElevenLabs STT integration with shared useVoiceInput hook
+- Mic button on both text capture screens with recording indicator
+- Files changed: services/elevenlabs-stt.ts, hooks/useVoiceInput.ts, app/index.tsx, app/text2.tsx
+- **Learnings for future iterations:**
+  - ElevenLabs STT endpoint: POST /v1/speech-to-text with FormData (file + model_id)
+  - Use Audio.Recording.createAsync(HIGH_QUALITY) for recording
+  - Must set allowsRecordingIOS:true before recording, false after
+  - FormData append for RN: {uri, type, name} cast as Blob
+  - Shared hook pattern: useVoiceInput(onTranscription) returns state + toggleRecording
 ---

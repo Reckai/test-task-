@@ -1,4 +1,9 @@
 const STT_URL = 'https://api.elevenlabs.io/v1/speech-to-text';
+const TIMEOUT_MS = 30000;
+
+interface ElevenLabsSttResponse {
+  text: string;
+}
 
 function getApiKey(): string {
   const key = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY;
@@ -24,24 +29,40 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
 
   formData.append('model_id', 'scribe_v1');
 
-  const response = await fetch(STT_URL, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-    },
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => 'Unknown error');
-    throw new Error(`ElevenLabs STT failed (${response.status}): ${errorBody}`);
+  try {
+    const response = await fetch(STT_URL, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+      },
+      body: formData,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => 'Unknown error');
+      throw new Error(`ElevenLabs STT failed (${response.status}): ${errorBody}`);
+    }
+
+    const data: ElevenLabsSttResponse = await response.json();
+
+    if (!data.text || typeof data.text !== 'string') {
+      throw new Error('Empty transcription returned');
+    }
+
+    return data.text;
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Transcription request timed out. Please try again.');
+      }
+      throw error;
+    }
+    throw new Error('An unexpected error occurred during transcription.');
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json();
-
-  if (!data.text || typeof data.text !== 'string') {
-    throw new Error('Empty transcription returned');
-  }
-
-  return data.text;
 }

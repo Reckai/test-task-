@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
 import { transcribeAudio } from '../services/elevenlabs-stt';
 
 type VoiceInputState = 'idle' | 'recording' | 'transcribing';
@@ -7,70 +7,50 @@ type VoiceInputState = 'idle' | 'recording' | 'transcribing';
 export function useVoiceInput(onTranscription: (text: string) => void) {
   const [state, setState] = useState<VoiceInputState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const onTranscriptionRef = useRef(onTranscription);
+  onTranscriptionRef.current = onTranscription;
+
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const startRecording = useCallback(async () => {
     setError(null);
-
     try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
         setError('Microphone permission denied');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-
-      recordingRef.current = recording;
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
       setState('recording');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to start recording';
       setError(message);
     }
-  }, []);
+  }, [audioRecorder]);
 
   const stopRecording = useCallback(async () => {
-    const recording = recordingRef.current;
-    if (!recording) return;
-
     setState('transcribing');
-
     try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
+      await audioRecorder.stop();
 
-      const uri = recording.getURI();
-      recordingRef.current = null;
-
-      if (!uri) {
-        throw new Error('No recording URI available');
-      }
+      const uri = audioRecorder.uri;
+      if (!uri) throw new Error('No recording URI available after stop');
 
       const text = await transcribeAudio(uri);
-      onTranscription(text);
+      onTranscriptionRef.current(text);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Transcription failed';
       setError(message);
     } finally {
       setState('idle');
     }
-  }, [onTranscription]);
+  }, [audioRecorder]);
 
   const toggleRecording = useCallback(() => {
-    if (state === 'recording') {
-      stopRecording();
-    } else if (state === 'idle') {
-      startRecording();
-    }
+    if (state === 'recording') stopRecording();
+    else if (state === 'idle') startRecording();
   }, [state, startRecording, stopRecording]);
 
   return {

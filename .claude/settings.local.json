@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npx expo:*)",
+      "Bash(export:*)",
+      "Bash(JAVA_HOME=\"/c/Users/reckai/.gradle/jdks/eclipse_adoptium-17-amd64-windows.2\" npx expo:*)"
+    ]
+  }
+}

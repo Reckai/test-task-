@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import type { MixingMode } from '../services/claude';
 
 const MODE_LABELS: Record<MixingMode, string> = {
@@ -29,32 +29,19 @@ export default function ResultScreen() {
     opacity: opacity.value,
   }));
 
-  const playChime = useCallback(async () => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        require('../assets/chime.wav'),
-      );
-      await sound.playAsync();
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
-    } catch {
-      // Sound playback is non-critical
-    }
-  }, []);
+  const chimePlayer = useAudioPlayer(require('../assets/chime.wav'));
 
   useEffect(() => {
     if (!result) return;
 
     opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.ease) });
-    playChime();
+    try { chimePlayer?.play(); } catch { /* non-critical */ }
 
-    // Typewriter effect
+    // Typewriter effect with adaptive speed
     let index = 0;
+    const charsPerTick = Math.max(1, Math.ceil(result.length / 120));
     const interval = setInterval(() => {
-      index++;
+      index += charsPerTick;
       setDisplayedText(result.slice(0, index));
       if (index >= result.length) {
         clearInterval(interval);
@@ -62,7 +49,7 @@ export default function ResultScreen() {
     }, 25);
 
     return () => clearInterval(interval);
-  }, [result, opacity, playChime]);
+  }, [result]);
 
   const handleMixAgain = () => {
     router.dismissAll();
@@ -87,11 +74,22 @@ export default function ResultScreen() {
           contentContainerStyle={styles.resultContent}
         >
           <Animated.View style={animatedStyle}>
-            <Text style={styles.resultText}>{displayedText}</Text>
+            <Text
+              style={styles.resultText}
+              accessibilityRole="text"
+              accessibilityLabel={`Mixed result: ${displayedText}`}
+            >
+              {displayedText}
+            </Text>
           </Animated.View>
         </ScrollView>
 
-        <Pressable style={styles.button} onPress={handleMixAgain}>
+        <Pressable
+          style={styles.button}
+          onPress={handleMixAgain}
+          accessibilityRole="button"
+          accessibilityLabel="Mix Again"
+        >
           <Text style={styles.buttonText}>Mix Again</Text>
         </Pressable>
       </View>
@@ -102,7 +100,7 @@ export default function ResultScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#ffffff',
   },
   container: {
     flex: 1,
@@ -110,28 +108,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: '#fff',
+    color: '#141414',
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 12,
   },
   modeBadge: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: '#1a1a1a',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     marginBottom: 24,
   },
   modeBadgeText: {
-    color: '#fff',
+    color: '#fafafa',
     fontSize: 13,
     fontWeight: '600',
   },
   resultScroll: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#16213e',
+    backgroundColor: '#f5f5f5',
     borderRadius: 16,
     marginBottom: 24,
   },
@@ -139,12 +137,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   resultText: {
-    color: '#e0e0e0',
+    color: '#141414',
     fontSize: 17,
     lineHeight: 26,
   },
   button: {
-    backgroundColor: '#6c63ff',
+    backgroundColor: '#1a1a1a',
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
@@ -152,7 +150,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    color: '#fff',
+    color: '#fafafa',
     fontSize: 16,
     fontWeight: '600',
   },

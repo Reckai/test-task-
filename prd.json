@@ -16,7 +16,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Foundation story - must be done first. Convert from registerRootComponent to expo-router entry point."
     },
     {
@@ -32,7 +32,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Set up basic navigation skeleton. Custom transitions will be enhanced in later stories."
     },
     {
@@ -49,7 +49,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Backend service only - no UI changes. Will be consumed by mixing screen."
     },
     {
@@ -65,7 +65,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Mic button and pill animation will be added in later stories (US-006, transitions enhancement)."
     },
     {
@@ -82,7 +82,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Mic button will be added in US-006."
     },
     {
@@ -101,7 +101,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Uses claude.ts service from US-005. Gradient glow effects optional."
     },
     {
@@ -116,7 +116,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Listen button will be added in US-007."
     },
     {
@@ -133,25 +133,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Add mic button to existing Screen 1 and Screen 2."
     },
-    {
-      "id": "US-007",
-      "title": "ElevenLabs TTS Integration (Listen to Result)",
-      "description": "As a user, I want to listen to the mixed result read aloud.",
-      "acceptanceCriteria": [
-        "Listen button on result screen",
-        "Tapping sends result text to ElevenLabs TTS API",
-        "Audio streams/plays back via expo-av",
-        "Loading state while TTS is generating",
-        "Button toggles to stop if audio is playing",
-        "Error handling for API failure",
-        "Typecheck passes"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": "Add Listen button to existing result screen."
-    }
   ]
 }

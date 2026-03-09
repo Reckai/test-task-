@@ -1,5 +1,14 @@
 export type MixingMode = 'style-transfer' | 'mashup';
 
+interface ClaudeContentBlock {
+  type: string;
+  text?: string;
+}
+
+interface ClaudeApiResponse {
+  content: ClaudeContentBlock[];
+}
+
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const TIMEOUT_MS = 30000;
 
@@ -36,6 +45,7 @@ export async function mixTexts(
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        // TODO: Move API calls to a backend proxy to remove the need for direct browser access
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
@@ -56,14 +66,14 @@ export async function mixTexts(
       throw new Error(`API request failed (${response.status}): ${errorBody}`);
     }
 
-    const data = await response.json();
+    const data: ClaudeApiResponse = await response.json();
 
     if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
       throw new Error('Invalid response format from Claude API');
     }
 
     const textBlock = data.content.find(
-      (block: { type: string }) => block.type === 'text',
+      (block) => block.type === 'text',
     );
 
     if (!textBlock || !textBlock.text) {
